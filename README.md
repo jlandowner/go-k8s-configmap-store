@@ -8,7 +8,7 @@ Support only for UTF-8 planetext data, not support for binary data now.
 # Install
 
 ```shell
-go get -u "github.com/jlandowner/go-k8s-configmap-store"
+go get "github.com/jlandowner/go-k8s-configmap-store"
 ```
 
 # Prerequirement
