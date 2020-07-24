@@ -95,7 +95,7 @@ func NewConfigMapStoreManager(stopCh <-chan struct{}, namespace string) (*Config
 func (c *ConfigMapStoreManager) CreateNewMapStore(ctx context.Context, name string) (*MapStore, error) {
 	_, exist := c.LocalMaps[name]
 	if exist {
-		return nil, fmt.Errorf("ConfigMap %s has already exist in cluster", name)
+		return c.GetMapStore(name)
 	}
 
 	c.lock.Lock()
@@ -214,10 +214,7 @@ func syncLocalMap(localMap map[string]*MapStore, syncList []*corev1.ConfigMap) {
 }
 
 func getLabelSelector() labels.Selector {
-	labelSelector, err := labels.Parse(namePrefix + "/managed in true")
-	if err != nil {
-		return labels.NewSelector()
-	}
+	labelSelector, _ := labels.Parse(namePrefix + "/managed in (true)")
 	return labelSelector
 }
 
