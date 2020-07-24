@@ -209,7 +209,7 @@ func syncLocalMap(localMap map[string]*MapStore, syncList []*corev1.ConfigMap) {
 }
 
 func getLabelSelector() labels.Selector {
-	labelSelector, err := labels.Parse(namePrefix + "/type in m")
+	labelSelector, err := labels.Parse(namePrefix + "/managed in true")
 	if err != nil {
 		return labels.NewSelector()
 	}
@@ -218,8 +218,7 @@ func getLabelSelector() labels.Selector {
 
 func getLabels() map[string]string {
 	labels := make(map[string]string, 0)
-	labels[namePrefix+"/type"] = "m"
-	labels[namePrefix+"/locked"] = "false"
+	labels[namePrefix+"/managed"] = "true"
 	return labels
 }
 
