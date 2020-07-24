@@ -2,7 +2,7 @@
 
 `go-k8s-configmap-store` is light key-value store for Go, using Kubernetes ConfigMap.
 
-Just run your app in cluster.
+Just run your app in k8s cluster.
 There is no need any other key-value store inside or outside your cluster.
 
 Support only for UTF-8 planetext data, not support for binary data now.
