@@ -1,4 +1,4 @@
-module github.com/jlandowner/go-k8s-configmap-storage
+module github.com/jlandowner/go-k8s-configmap-store
 
 go 1.14
 

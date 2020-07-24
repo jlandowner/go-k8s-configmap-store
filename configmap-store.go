@@ -1,4 +1,4 @@
-package storage
+package store
 
 import (
 	"context"
@@ -20,25 +20,25 @@ import (
 )
 
 const (
-	namePrefix = "storage.k8s.jlandowner.com"
+	namePrefix = "store.k8s.jlandowner.com"
 )
 
-// ConfigMapStorageManager is a manager of configmaps
-type ConfigMapStorageManager struct {
+// ConfigMapStoreManager is a manager of configmaps
+type ConfigMapStoreManager struct {
 	k8sclient *kubernetes.Clientset
-	LocalMaps map[string]*MapStorage
+	LocalMaps map[string]*MapStore
 	namespace string
 	lock      *sync.RWMutex
 }
 
-// MapStorage is a configmap as m
-type MapStorage struct {
+// MapStore is a configmap as m
+type MapStore struct {
 	configMap *corev1.ConfigMap
 	lock      *sync.RWMutex
 }
 
-// NewConfigMapStorageManager returns ConfigMapStorageManager
-func NewConfigMapStorageManager(stopCh <-chan struct{}, namespace string) (*ConfigMapStorageManager, error) {
+// NewConfigMapStoreManager returns ConfigMapStoreManager
+func NewConfigMapStoreManager(stopCh <-chan struct{}, namespace string) (*ConfigMapStoreManager, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func NewConfigMapStorageManager(stopCh <-chan struct{}, namespace string) (*Conf
 		return nil, err
 	}
 
-	maps := make(map[string]*MapStorage, 0)
+	maps := make(map[string]*MapStore, 0)
 
 	factory := informers.NewSharedInformerFactory(client, time.Minute)
 	listener := factory.Core().V1().ConfigMaps().Lister()
@@ -83,7 +83,7 @@ func NewConfigMapStorageManager(stopCh <-chan struct{}, namespace string) (*Conf
 		klog.Infoln("informer stopped")
 	}()
 
-	return &ConfigMapStorageManager{
+	return &ConfigMapStoreManager{
 		k8sclient: client,
 		LocalMaps: maps,
 		lock:      new(sync.RWMutex),
@@ -91,8 +91,8 @@ func NewConfigMapStorageManager(stopCh <-chan struct{}, namespace string) (*Conf
 	}, nil
 }
 
-// CreateNewMapStorage creates new configmap as managed map
-func (c *ConfigMapStorageManager) CreateNewMapStorage(ctx context.Context, name string) (*MapStorage, error) {
+// CreateNewMapStore creates new configmap as managed map
+func (c *ConfigMapStoreManager) CreateNewMapStore(ctx context.Context, name string) (*MapStore, error) {
 	_, exist := c.LocalMaps[name]
 	if exist {
 		return nil, fmt.Errorf("ConfigMap %s has already exist in cluster", name)
@@ -108,23 +108,23 @@ func (c *ConfigMapStorageManager) CreateNewMapStorage(ctx context.Context, name 
 
 	res, err := c.k8sclient.CoreV1().ConfigMaps(c.namespace).Create(ctx, cm, metav1.CreateOptions{})
 	if apierrs.IsAlreadyExists(err) {
-		return c.GetMapStorage(name)
+		return c.GetMapStore(name)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	m := &MapStorage{configMap: res, lock: new(sync.RWMutex)}
+	m := &MapStore{configMap: res, lock: new(sync.RWMutex)}
 	c.LocalMaps[name] = m
 
 	return m, nil
 }
 
-// DeleteMapStorage removes configmap
-func (c *ConfigMapStorageManager) DeleteMapStorage(ctx context.Context, name string) error {
+// DeleteMapStore removes configmap
+func (c *ConfigMapStoreManager) DeleteMapStore(ctx context.Context, name string) error {
 	m, exist := c.LocalMaps[name]
 	if !exist {
-		return fmt.Errorf("MapStorage %s do not exist in cluster", name)
+		return fmt.Errorf("MapStore %s do not exist in cluster", name)
 	}
 	c.lock.Lock()
 	defer c.lock.Unlock()
@@ -138,24 +138,24 @@ func (c *ConfigMapStorageManager) DeleteMapStorage(ctx context.Context, name str
 	return nil
 }
 
-// GetMapStorage returns value by given key
-func (c *ConfigMapStorageManager) GetMapStorage(name string) (*MapStorage, error) {
+// GetMapStore returns value by given key
+func (c *ConfigMapStoreManager) GetMapStore(name string) (*MapStore, error) {
 	m, exist := c.LocalMaps[name]
 	if !exist {
-		return nil, fmt.Errorf("MapStorage %s do not exist in cluster", name)
+		return nil, fmt.Errorf("MapStore %s do not exist in cluster", name)
 	}
 	return m, nil
 }
 
 // Commit commit the local change
-func (c *ConfigMapStorageManager) Commit(ctx context.Context, m *MapStorage) error {
+func (c *ConfigMapStoreManager) Commit(ctx context.Context, m *MapStore) error {
 	ret, err := c.k8sclient.CoreV1().ConfigMaps(m.configMap.Namespace).Update(ctx, m.configMap, metav1.UpdateOptions{})
 	syncLocalMap(c.LocalMaps, []*corev1.ConfigMap{ret})
 	return err
 }
 
 // Upsert update or insert value by given key
-func (m *MapStorage) Upsert(ctx context.Context, key, value string) {
+func (m *MapStore) Upsert(ctx context.Context, key, value string) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -167,7 +167,7 @@ func (m *MapStorage) Upsert(ctx context.Context, key, value string) {
 }
 
 // Delete remove given key
-func (m *MapStorage) Delete(ctx context.Context, key string) {
+func (m *MapStore) Delete(ctx context.Context, key string) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
 
@@ -175,12 +175,12 @@ func (m *MapStorage) Delete(ctx context.Context, key string) {
 }
 
 // Get returns value by given key
-func (m *MapStorage) Get(key string) (string, bool) {
+func (m *MapStore) Get(key string) (string, bool) {
 	val, ok := m.configMap.Data[key]
 	return val, ok
 }
 
-func syncLocalMap(localMap map[string]*MapStorage, syncList []*corev1.ConfigMap) {
+func syncLocalMap(localMap map[string]*MapStore, syncList []*corev1.ConfigMap) {
 	// sync Add or Update
 	for _, cm := range syncList {
 		namekey := extractBaseName(cm.Name)
@@ -190,7 +190,7 @@ func syncLocalMap(localMap map[string]*MapStorage, syncList []*corev1.ConfigMap)
 			m.configMap = cm
 			m.lock.Unlock()
 		} else {
-			localMap[namekey] = &MapStorage{configMap: cm, lock: new(sync.RWMutex)}
+			localMap[namekey] = &MapStore{configMap: cm, lock: new(sync.RWMutex)}
 		}
 	}
 

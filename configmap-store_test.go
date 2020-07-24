@@ -1,4 +1,4 @@
-package storage
+package store
 
 import (
 	"fmt"
@@ -32,12 +32,12 @@ func TestExtractBaseName(t *testing.T) {
 func TestSyncLocalMap(t *testing.T) {
 	tests := []struct {
 		name     string
-		localMap map[string]*MapStorage
+		localMap map[string]*MapStore
 		syncList []*corev1.ConfigMap
 	}{
 		{
 			name: "Increase localMap",
-			localMap: map[string]*MapStorage{
+			localMap: map[string]*MapStore{
 				"foo": {configMap: &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{Name: namePrefix + "." + "foo"},
 					Data:       map[string]string{"testdata1": "foo"},
@@ -64,7 +64,7 @@ func TestSyncLocalMap(t *testing.T) {
 		},
 		{
 			name: "Decrease localMap",
-			localMap: map[string]*MapStorage{
+			localMap: map[string]*MapStore{
 				"foo": {configMap: &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{Name: namePrefix + "." + "foo"},
 					Data:       map[string]string{"testdata1": "foo"},
@@ -94,10 +94,10 @@ func TestSyncLocalMap(t *testing.T) {
 
 		syncLocalMap(test.localMap, test.syncList)
 
-		for _, mapStorage := range test.localMap {
+		for _, mapStore := range test.localMap {
 			wg.Add(1)
-			t.Log("After:", mapStorage.configMap.Name)
-			localcm := mapStorage.configMap
+			t.Log("After:", mapStore.configMap.Name)
+			localcm := mapStore.configMap
 			go func(localcm *corev1.ConfigMap, syncList []*corev1.ConfigMap) {
 				fmt.Println(localcm.Name, localcm.Data)
 				l.Lock()
