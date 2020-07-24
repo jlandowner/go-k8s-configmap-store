@@ -35,6 +35,8 @@ spec:
 
 # Usage & Example
 
+Here is an example: 
+
 ```go
 package main
 
