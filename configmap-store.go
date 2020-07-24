@@ -56,7 +56,7 @@ func NewConfigMapStoreManager(stopCh <-chan struct{}, namespace string) (*Config
 	labelSelector := getLabelSelector()
 
 	resync := func() {
-		klog.Infoln("Resyncing local maps.")
+		klog.Infoln("Syncing local maps")
 		ret, err := listener.List(labelSelector)
 		if err != nil {
 			return
@@ -166,7 +166,7 @@ func (m *MapStore) Upsert(ctx context.Context, key, value string) {
 	}
 }
 
-// Delete remove given key
+// Delete remove the given key
 func (m *MapStore) Delete(ctx context.Context, key string) {
 	m.lock.Lock()
 	defer m.lock.Unlock()
@@ -178,6 +178,11 @@ func (m *MapStore) Delete(ctx context.Context, key string) {
 func (m *MapStore) Get(key string) (string, bool) {
 	val, ok := m.configMap.Data[key]
 	return val, ok
+}
+
+// GetConfigMap returns corev1.ConfigMap of MapStore
+func (m *MapStore) GetConfigMap() corev1.ConfigMap {
+	return *m.configMap
 }
 
 func syncLocalMap(localMap map[string]*MapStore, syncList []*corev1.ConfigMap) {
