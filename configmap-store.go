@@ -23,7 +23,7 @@ const (
 	namePrefix = "store.k8s.jlandowner.com"
 )
 
-// ConfigMapStoreManager is a manager of configmaps
+// ConfigMapStoreManager is a manager of ConfigMaps
 type ConfigMapStoreManager struct {
 	k8sclient *kubernetes.Clientset
 	LocalMaps map[string]*MapStore
@@ -31,7 +31,7 @@ type ConfigMapStoreManager struct {
 	lock      *sync.RWMutex
 }
 
-// MapStore is a configmap as m
+// MapStore has the ConfigMap and methods to CRUD to the ConfigMap's Data
 type MapStore struct {
 	configMap *corev1.ConfigMap
 	lock      *sync.RWMutex
@@ -91,7 +91,7 @@ func NewConfigMapStoreManager(stopCh <-chan struct{}, namespace string) (*Config
 	}, nil
 }
 
-// CreateNewMapStore creates new configmap as managed map
+// CreateNewMapStore creates new ConfigMap as managed map
 func (c *ConfigMapStoreManager) CreateNewMapStore(ctx context.Context, name string) (*MapStore, error) {
 	_, exist := c.LocalMaps[name]
 	if exist {
@@ -120,7 +120,7 @@ func (c *ConfigMapStoreManager) CreateNewMapStore(ctx context.Context, name stri
 	return m, nil
 }
 
-// DeleteMapStore removes configmap
+// DeleteMapStore removes ConfigMap
 func (c *ConfigMapStoreManager) DeleteMapStore(ctx context.Context, name string) error {
 	m, exist := c.LocalMaps[name]
 	if !exist {
