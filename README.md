@@ -51,28 +51,28 @@ func main() {
 	stop := make(chan struct{})
 	defer close(stop)
 
-    // Create store manager
+    	// Create store manager
 	manager, err := kcs.NewConfigMapStoreManager(stop, "default")
 	if err != nil {
 		log.Fatalln(err)
 	}
 
 	ctx := context.Background()
-    // Create new ConfigMap store
+    	// Create new ConfigMap store
 	exampleMap, err := manager.CreateNewMapStore(ctx, "example")
 	if err != nil {
 		log.Fatalln(err)
 	}
 
-    // Upsert key-value data in the ConfigMap store
+    	// Upsert key-value data in the ConfigMap store
 	exampleMap.Upsert(ctx, "hello", "world")
 
-    // Commit change
+    	// Commit change
 	if err := manager.Commit(ctx, exampleMap); err != nil {
 		log.Println(err)
 	}
 
-    // Get value by given key
+    	// Get value by given key
 	val, ok = exampleMap.Get("hello")
 	if ok {
 		log.Println(val)
