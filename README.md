@@ -75,7 +75,7 @@ func main() {
 	}
 
 	// Get value by given key
-	val, ok = exampleMap.Get("hello")
+	val, ok := exampleMap.Get("hello")
 	if ok {
 		log.Println(val)
 	} else {
