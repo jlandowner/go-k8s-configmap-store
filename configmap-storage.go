@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +15,8 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+
+	"k8s.io/klog/v2"
 )
 
 const (
@@ -55,6 +56,7 @@ func NewConfigMapStorageManager(stopCh <-chan struct{}, namespace string) (*Conf
 	labelSelector := getLabelSelector()
 
 	resync := func() {
+		klog.Infoln("Resyncing local maps.")
 		ret, err := listener.List(labelSelector)
 		if err != nil {
 			return
@@ -76,8 +78,9 @@ func NewConfigMapStorageManager(stopCh <-chan struct{}, namespace string) (*Conf
 	})
 
 	go func() {
+		klog.Infoln("informer starting")
 		informer.Run(stopCh)
-		log.Println("informer stopped")
+		klog.Infoln("informer stopped")
 	}()
 
 	return &ConfigMapStorageManager{
@@ -101,7 +104,7 @@ func (c *ConfigMapStorageManager) CreateNewMapStorage(ctx context.Context, name 
 	cm := &corev1.ConfigMap{}
 	cm.SetName(namePrefix + "." + name)
 	cm.SetLabels(getLabels())
-	cm.Data = map[string]string{"dummy": time.Now().String()}
+	cm.Data = map[string]string{"DATE": time.Now().String()}
 
 	res, err := c.k8sclient.CoreV1().ConfigMaps(c.namespace).Create(ctx, cm, metav1.CreateOptions{})
 	if apierrs.IsAlreadyExists(err) {
@@ -178,6 +181,7 @@ func (m *MapStorage) Get(key string) (string, bool) {
 }
 
 func syncLocalMap(localMap map[string]*MapStorage, syncList []*corev1.ConfigMap) {
+	// sync Add or Update
 	for _, cm := range syncList {
 		namekey := extractBaseName(cm.Name)
 		m, exist := localMap[namekey]
@@ -187,6 +191,19 @@ func syncLocalMap(localMap map[string]*MapStorage, syncList []*corev1.ConfigMap)
 			m.lock.Unlock()
 		} else {
 			localMap[namekey] = &MapStorage{configMap: cm, lock: new(sync.RWMutex)}
+		}
+	}
+
+	// sync Delete
+	for _, lm := range localMap {
+		foundInCluster := false
+		for _, cm := range syncList {
+			if lm.configMap.Name == cm.Name {
+				foundInCluster = true
+			}
+		}
+		if !foundInCluster {
+			delete(localMap, extractBaseName(lm.configMap.Name))
 		}
 	}
 }

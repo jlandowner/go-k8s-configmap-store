@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -35,7 +36,7 @@ func TestSyncLocalMap(t *testing.T) {
 		syncList []*corev1.ConfigMap
 	}{
 		{
-			name: "test1",
+			name: "Increase localMap",
 			localMap: map[string]*MapStorage{
 				"foo": {configMap: &corev1.ConfigMap{
 					ObjectMeta: metav1.ObjectMeta{Name: namePrefix + "." + "foo"},
@@ -61,6 +62,25 @@ func TestSyncLocalMap(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "Decrease localMap",
+			localMap: map[string]*MapStorage{
+				"foo": {configMap: &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: namePrefix + "." + "foo"},
+					Data:       map[string]string{"testdata1": "foo"},
+				}, lock: new(sync.RWMutex)},
+				"bar": {configMap: &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{Name: namePrefix + "." + "bar"},
+					Data:       map[string]string{"testdata1": "bar"},
+				}, lock: new(sync.RWMutex)},
+			},
+			syncList: []*corev1.ConfigMap{
+				{
+					ObjectMeta: metav1.ObjectMeta{Name: namePrefix + "." + "foo"},
+					Data:       map[string]string{"testdata1": "foo"},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -68,24 +88,34 @@ func TestSyncLocalMap(t *testing.T) {
 		wg := new(sync.WaitGroup)
 		c := sync.NewCond(l)
 
+		for _, l := range test.localMap {
+			t.Log("Before:", l.configMap.Name, l.configMap.Data)
+		}
+
 		syncLocalMap(test.localMap, test.syncList)
 
-		for _, cm := range test.syncList {
+		for _, mapStorage := range test.localMap {
 			wg.Add(1)
-			t.Log(cm.Name)
-			a := cm
-			go func(cm *corev1.ConfigMap) {
-				fmt.Println(cm.Name, cm.Data)
+			t.Log("After:", mapStorage.configMap.Name)
+			localcm := mapStorage.configMap
+			go func(localcm *corev1.ConfigMap, syncList []*corev1.ConfigMap) {
+				fmt.Println(localcm.Name, localcm.Data)
 				l.Lock()
 				defer l.Unlock()
 				c.Wait()
 				fmt.Println("GO!")
 
-				data, exist := test.localMap[extractBaseName(cm.Name)]
-				assert.True(t, exist)
-				assert.Equal(t, *cm, *data.configMap)
+				ok := false
+				for _, sync := range syncList {
+					if reflect.DeepEqual(*localcm, *sync) {
+						ok = true
+					}
+				}
+				if !ok {
+					t.Errorf("Not match in %s", localcm.Name)
+				}
 				wg.Done()
-			}(a)
+			}(localcm, test.syncList)
 		}
 		time.Sleep(3 * time.Second)
 		c.Broadcast()
