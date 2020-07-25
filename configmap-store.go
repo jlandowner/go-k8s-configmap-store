@@ -34,7 +34,7 @@ type MapStore struct {
 }
 
 // NewConfigMapStoreManager returns ConfigMapStoreManager
-func NewConfigMapStoreManager(stopCh <-chan struct{}, namespace string) (*ConfigMapStoreManager, error) {
+func NewConfigMapStoreManager(ctx context.Context, namespace string) (*ConfigMapStoreManager, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, err
@@ -45,16 +45,25 @@ func NewConfigMapStoreManager(stopCh <-chan struct{}, namespace string) (*Config
 		return nil, err
 	}
 
+	localmaps := make(map[string]string, 0)
+	maps, err := client.CoreV1().ConfigMaps(namespace).List(ctx, metav1.ListOptions{LabelSelector: getLabelSelector().String()})
+	if err != nil {
+		return nil, err
+	}
+	for _, cm := range maps.Items {
+		localmaps[extractBaseName(cm.Name)] = cm.Name
+	}
+
 	return &ConfigMapStoreManager{
 		k8sclient: client,
-		localMaps: make(map[string]string, 0),
+		localMaps: localmaps,
 		lock:      new(sync.RWMutex),
 		namespace: namespace,
 	}, nil
 }
 
-// CreateNewMapStore creates new ConfigMap as managed map
-func (c *ConfigMapStoreManager) CreateNewMapStore(ctx context.Context, name string) (*MapStore, error) {
+// NewMapStore creates new ConfigMap as store and returns MapStore
+func (c *ConfigMapStoreManager) NewMapStore(ctx context.Context, name string) (*MapStore, error) {
 	_, exist := c.localMaps[name]
 	if exist {
 		return c.GetMapStore(ctx, name)
@@ -68,15 +77,12 @@ func (c *ConfigMapStoreManager) CreateNewMapStore(ctx context.Context, name stri
 	cm.SetLabels(getLabels())
 
 	ret, err := c.k8sclient.CoreV1().ConfigMaps(c.namespace).Create(ctx, cm, metav1.CreateOptions{})
-	if apierrs.IsAlreadyExists(err) {
-		return c.GetMapStore(ctx, name)
-	}
-	if err != nil {
+	if err != nil && !apierrs.IsAlreadyExists(err) {
 		return nil, err
 	}
 
 	c.localMaps[name] = ret.Name
-	return &MapStore{configMap: ret, lock: new(sync.RWMutex)}, nil
+	return &MapStore{k8sclient: c.k8sclient, configMap: ret, lock: new(sync.RWMutex)}, nil
 }
 
 // DeleteMapStore removes ConfigMap
@@ -97,19 +103,19 @@ func (c *ConfigMapStoreManager) DeleteMapStore(ctx context.Context, name string)
 	return nil
 }
 
-// GetMapStore returns value by given key
+// GetMapStore returns MapStore by given name
 func (c *ConfigMapStoreManager) GetMapStore(ctx context.Context, name string) (*MapStore, error) {
 	cname, exist := c.localMaps[name]
 	if !exist {
 		return nil, fmt.Errorf("MapStore %s do not exist in cluster", name)
 	}
 
-	cm, err := c.k8sclient.CoreV1().ConfigMaps(c.namespace).Get(ctx, cname, metav1.GetOptions{})
+	ret, err := c.k8sclient.CoreV1().ConfigMaps(c.namespace).Get(ctx, cname, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
 
-	return &MapStore{k8sclient: c.k8sclient, configMap: cm, lock: new(sync.RWMutex)}, nil
+	return &MapStore{k8sclient: c.k8sclient, configMap: ret, lock: new(sync.RWMutex)}, nil
 }
 
 // Upsert update or insert value by given key
@@ -177,12 +183,12 @@ func (m *MapStore) GetConfigMap() corev1.ConfigMap {
 }
 
 func getLabelSelector() labels.Selector {
-	labelSelector, _ := labels.Parse(namePrefix + "/managed in (true)")
+	labelSelector, _ := labels.Parse(namePrefix + "/store in (1)")
 	return labelSelector
 }
 
 func getLabels() map[string]string {
-	labels := map[string]string{namePrefix + "/managed": "true"}
+	labels := map[string]string{namePrefix + "/store": "1"}
 	return labels
 }
 
