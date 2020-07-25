@@ -1,14 +1,13 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: go-configmap-store
-  namespace: default
+  name: configmap-store
+  namespace: default # Change your own namespace
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: go-configmap-store
-  namespace: default
+  name: store.k8s.jlandowner.com.configmap-store
 rules:
 - apiGroups:
   - ""
@@ -24,13 +23,12 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: go-configmap-store
-  namespace: default
+  name: store.k8s.jlandowner.com.configmap-store
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: go-configmap-store
+  name: store.k8s.jlandowner.com.configmap-store
 subjects:
 - kind: ServiceAccount
-  name: go-configmap-store
-  namespace: default
+  name: configmap-store
+  namespace: default # Change your own namespace

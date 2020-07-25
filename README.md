@@ -21,7 +21,7 @@ Apply ServiceAccount and ClusterRoles.
 kubectl apply -f https://raw.githubusercontent.com/jlandowner/go-k8s-configmap-store/master/rbac.yaml
 ```
 
-Also, your apps should run with the ServiceAccount `go-configmap-store`
+Also, your apps should run with the ServiceAccount `configmap-store`
 
 ```yaml
 apiVersion: v1
