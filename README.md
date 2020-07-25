@@ -50,37 +50,35 @@ import (
 )
 
 func main() {
-	stop := make(chan struct{})
-	defer close(stop)
+	ctx := context.Background()
 
 	// Create store manager
-	man, err := kcs.NewConfigMapStoreManager(stop, "default")
+	man, err := kcs.NewConfigMapStoreManager(ctx, "default")
 	if err != nil {
-		log.Fatalln(err)
+		panic(err)
 	}
 
-	ctx := context.Background()
 	// Create new ConfigMap store
-	exampleMap, err := man.CreateNewMapStore(ctx, "example")
+	exampleMap, err := man.NewMapStore(ctx, "example")
 	if err != nil {
-		log.Fatalln(err)
+		panic(err)
 	}
+
+	log.Println(exampleMap.GetConfigMap().Name)
 
 	// Upsert key-value data in the ConfigMap store
-	exampleMap.Upsert(ctx, "hello", "world")
-
-	// Commit change
-	if err := man.Commit(ctx, exampleMap); err != nil {
-		log.Println(err)
+	err = exampleMap.Upsert(ctx, "hello", "world")
+	if err != nil {
+		panic(err)
 	}
 
 	// Get value by given key
-	val, ok := exampleMap.Get("hello")
-	if ok {
-		log.Println(val)
-	} else {
-		log.Fatalln("Failed to get")
+	val, err := exampleMap.Get(ctx, "hello")
+	if err != nil {
+		panic(err)
 	}
+
+	log.Println("OK", val)
 }
 ```
 
