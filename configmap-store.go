@@ -76,13 +76,15 @@ func (c *ConfigMapStoreManager) NewMapStore(ctx context.Context, name string) (*
 	cm.SetName(namePrefix + "." + name)
 	cm.SetLabels(getLabels())
 
-	ret, err := c.k8sclient.CoreV1().ConfigMaps(c.namespace).Create(ctx, cm, metav1.CreateOptions{})
-	if err != nil && !apierrs.IsAlreadyExists(err) {
-		return nil, err
+	if c.k8sclient != nil {
+		ret, err := c.k8sclient.CoreV1().ConfigMaps(c.namespace).Create(ctx, cm, metav1.CreateOptions{})
+		if err != nil && !apierrs.IsAlreadyExists(err) {
+			return nil, err
+		}
+		cm = ret
 	}
-
-	c.localMaps[name] = ret.Name
-	return &MapStore{k8sclient: c.k8sclient, configMap: ret, lock: new(sync.RWMutex)}, nil
+	c.localMaps[name] = cm.Name
+	return &MapStore{k8sclient: c.k8sclient, configMap: cm, lock: new(sync.RWMutex)}, nil
 }
 
 // DeleteMapStore removes ConfigMap
@@ -94,9 +96,11 @@ func (c *ConfigMapStoreManager) DeleteMapStore(ctx context.Context, name string)
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	err := c.k8sclient.CoreV1().ConfigMaps(c.namespace).Delete(ctx, cname, metav1.DeleteOptions{})
-	if err != nil {
-		return err
+	if c.k8sclient != nil {
+		err := c.k8sclient.CoreV1().ConfigMaps(c.namespace).Delete(ctx, cname, metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
 	}
 
 	delete(c.localMaps, name)
@@ -110,12 +114,16 @@ func (c *ConfigMapStoreManager) GetMapStore(ctx context.Context, name string) (*
 		return nil, fmt.Errorf("MapStore %s do not exist in cluster", name)
 	}
 
-	ret, err := c.k8sclient.CoreV1().ConfigMaps(c.namespace).Get(ctx, cname, metav1.GetOptions{})
-	if err != nil {
-		return nil, err
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: cname, Namespace: c.namespace}}
+	if c.k8sclient != nil {
+		ret, err := c.k8sclient.CoreV1().ConfigMaps(c.namespace).Get(ctx, cname, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		cm = ret
 	}
 
-	return &MapStore{k8sclient: c.k8sclient, configMap: ret, lock: new(sync.RWMutex)}, nil
+	return &MapStore{k8sclient: c.k8sclient, configMap: cm, lock: new(sync.RWMutex)}, nil
 }
 
 // Upsert update or insert value by given key
@@ -129,11 +137,13 @@ func (m *MapStore) Upsert(ctx context.Context, key, value string) error {
 		m.configMap.Data = map[string]string{key: value}
 	}
 
-	ret, err := m.k8sclient.CoreV1().ConfigMaps(m.configMap.Namespace).Update(ctx, m.configMap, metav1.UpdateOptions{})
-	if err != nil {
-		return err
+	if m.k8sclient != nil {
+		ret, err := m.k8sclient.CoreV1().ConfigMaps(m.configMap.Namespace).Update(ctx, m.configMap, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+		m.configMap = ret
 	}
-	m.configMap = ret
 	return nil
 }
 
@@ -151,25 +161,29 @@ func (m *MapStore) Delete(ctx context.Context, key string) error {
 
 	delete(m.configMap.Data, key)
 
-	ret, err := m.k8sclient.CoreV1().ConfigMaps(m.configMap.Namespace).Update(ctx, m.configMap, metav1.UpdateOptions{})
-	if err != nil {
-		return err
+	if m.k8sclient != nil {
+		ret, err := m.k8sclient.CoreV1().ConfigMaps(m.configMap.Namespace).Update(ctx, m.configMap, metav1.UpdateOptions{})
+		if err != nil {
+			return err
+		}
+		m.configMap = ret
 	}
-	m.configMap = ret
 	return nil
 }
 
 // Get returns value by given key
 func (m *MapStore) Get(ctx context.Context, key string) (string, error) {
-	cm, err := m.k8sclient.CoreV1().ConfigMaps(m.configMap.Namespace).Get(ctx, m.configMap.Name, metav1.GetOptions{})
-	if err != nil {
-		return "", err
+	if m.k8sclient != nil {
+		cm, err := m.k8sclient.CoreV1().ConfigMaps(m.configMap.Namespace).Get(ctx, m.configMap.Name, metav1.GetOptions{})
+		if err != nil {
+			return "", err
+		}
+		m.configMap = cm
 	}
-	if cm.Data == nil {
+	if m.configMap.Data == nil {
 		return "", fmt.Errorf("MapStore %s does not have key %s", extractBaseName(m.configMap.Name), key)
 	}
-
-	val, exist := cm.Data[key]
+	val, exist := m.configMap.Data[key]
 	if !exist {
 		return "", fmt.Errorf("MapStore %s does not have key %s", extractBaseName(m.configMap.Name), key)
 	}
