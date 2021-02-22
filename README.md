@@ -2,10 +2,8 @@
 
 `go-k8s-configmap-store` is light key-value store for Go, using Kubernetes ConfigMap.
 
-Support only for UTF-8 planetext data, not support for binary data now.
-
-Now it does NOT lock any ConfigMaps in the cluster.
-DO NOT use this package in multiple or replicated Pods and containers.
+Support only for UTF-8 planetext data, not support for binary data.
+And it does NOT lock any ConfigMaps in the cluster.
 
 # Install
 
@@ -21,7 +19,7 @@ Apply ServiceAccount and ClusterRoles.
 kubectl apply -f https://raw.githubusercontent.com/jlandowner/go-k8s-configmap-store/master/rbac.yaml
 ```
 
-Also, your apps should run with the ServiceAccount `configmap-store`
+Then your apps should run with the ServiceAccount `configmap-store`
 
 ```yaml
 apiVersion: v1
@@ -32,12 +30,10 @@ spec:
   containers:
   - name: XXX
     image: XXX
-  serviceAccount: go-configmap-store # Require
+  serviceAccount: configmap-store # Require
 ```
 
-# Usage & Example
-
-Here is an example: 
+# Usage example
 
 ```go
 package main
